@@ -1,24 +1,24 @@
 ﻿using Xamarin.Forms;
 
-namespace Xam.Forms.MarkdownView.Themes
+namespace MarkdownView.Theming
 {
-    public class DarkMarkdownTheme : MarkdownTheme
+    public class LightTheme : BaseTheme
     {
-        public static readonly Color DefaultBackgroundColor = Color.FromHex("#2b303b");
+        public static readonly Color DefaultBackgroundColor = Color.FromHex("#ffffff");
 
-        public static readonly Color DefaultAccentColor = Color.FromHex("#d08770");
+        public static readonly Color DefaultAccentColor = Color.FromHex("#0366d6");
 
-        public static readonly Color DefaultTextColor = Color.FromHex("#eff1f5");
+        public static readonly Color DefaultTextColor = Color.FromHex("#24292e");
 
-        public static readonly Color DefaultCodeBackground = Color.FromHex("#4f5b66");
+        public static readonly Color DefaultCodeBackground = Color.FromHex("#f6f8fa");
 
-        public static readonly Color DefaultSeparatorColor = Color.FromHex("#65737e");
+        public static readonly Color DefaultSeparatorColor = Color.FromHex("#eaecef");
 
-        public static readonly Color DefaultQuoteTextColor = Color.FromHex("#a7adba");
+        public static readonly Color DefaultQuoteTextColor = Color.FromHex("#6a737d");
 
-        public static readonly Color DefaultQuoteBorderColor = Color.FromHex("#a7adba");
+        public static readonly Color DefaultQuoteBorderColor = Color.FromHex("#dfe2e5");
 
-        public DarkMarkdownTheme()
+        public LightTheme()
         {
             BackgroundColor = DefaultBackgroundColor;
             Paragraph.ForegroundColor = DefaultTextColor;

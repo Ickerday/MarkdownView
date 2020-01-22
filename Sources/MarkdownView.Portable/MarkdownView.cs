@@ -1,90 +1,71 @@
 ﻿using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
+using MarkdownView.Extensions;
+using MarkdownView.Factories.Spans;
+using MarkdownView.Theming;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Xam.Forms.MarkdownView.Extensions;
-using Xam.Forms.MarkdownView.Themes;
 using Xamarin.Essentials;
 using Xamarin.Forms;
 using MarkdigParser = Markdig.Markdown;
 
-namespace Xam.Forms.MarkdownView
+namespace MarkdownView
 {
+    [ContentProperty(nameof(Markdown))]
     public class MarkdownView : ContentView
     {
-        private IDictionary<string, string> _links = new Dictionary<string, string>();
-        private readonly List<View> _queuedViews = new List<View>();
-        private StackLayout _stackLayout;
-        private bool _isQuoted;
-        private int _listScope;
+        private List<View> QueuedViews { get; } = new List<View>();
+        private IDictionary<string, string> Links { get; } = new Dictionary<string, string>();
+        private bool IsQuoted { get; set; }
 
-        public Action<string> NavigateToLink { get; set; } = uriString => Launcher.OpenAsync(new Uri(uriString));
+        public static Func<string, Task> LinkCallbackFunc { get; set; } = async uriString => await Launcher.OpenAsync(new Uri(uriString));
 
-        public string Markdown { get => (string)GetValue(MarkdownProperty); set => SetValue(MarkdownProperty, value); }
         public static readonly BindableProperty MarkdownProperty = BindableProperty.Create(nameof(Markdown), typeof(string), typeof(MarkdownView), null, propertyChanged: OnMarkdownChanged);
+        public string Markdown { get => (string)GetValue(MarkdownProperty); set => SetValue(MarkdownProperty, value); }
 
-        public string RelativeUrlHost { get => (string)GetValue(RelativeUrlHostProperty); set => SetValue(RelativeUrlHostProperty, value); }
         public static readonly BindableProperty RelativeUrlHostProperty = BindableProperty.Create(nameof(RelativeUrlHost), typeof(string), typeof(MarkdownView), null, propertyChanged: OnMarkdownChanged);
+        public string RelativeUrlHost { get => (string)GetValue(RelativeUrlHostProperty); set => SetValue(RelativeUrlHostProperty, value); }
 
-        public static MarkdownTheme DefaultTheme = new LightMarkdownTheme();
-        public MarkdownTheme Theme { get => (MarkdownTheme)GetValue(ThemeProperty); set => SetValue(ThemeProperty, value); }
-        public static readonly BindableProperty ThemeProperty = BindableProperty.Create(nameof(Theme), typeof(MarkdownTheme), typeof(MarkdownView), DefaultTheme, propertyChanged: OnMarkdownChanged);
+        public static BaseTheme DefaultTheme = new LightTheme();
+        public static readonly BindableProperty ThemeProperty = BindableProperty.Create(nameof(Theme), typeof(BaseTheme), typeof(MarkdownView), DefaultTheme, propertyChanged: OnMarkdownChanged);
+        public BaseTheme Theme { get => (BaseTheme)GetValue(ThemeProperty); set => SetValue(ThemeProperty, value); }
 
         private static void OnMarkdownChanged(BindableObject bindable, object oldValue, object newValue)
         {
-            var view = bindable as MarkdownView;
-            view?.RenderMarkdown();
-        }
-
-        private void RenderMarkdown()
-        {
-            Padding = Theme.Margin;
-            BackgroundColor = Theme.BackgroundColor;
-            _stackLayout = new StackLayout { Spacing = Theme.Margin };
-            if (!string.IsNullOrWhiteSpace(Markdown))
-            {
-                var parsed = MarkdigParser.Parse(Markdown);
-                Render(parsed.AsEnumerable());
-            }
-            Content = _stackLayout; // Show the content only when the whole text has been parsed
-        }
-
-        private void Render(IEnumerable<Block> blocks)
-        {
-            foreach (var block in blocks)
-                Render(block);
-        }
-
-        private void AttachLinks(View view)
-        {
-            if (!_links.Any())
+            if (string.IsNullOrWhiteSpace(newValue.ToString()) || !(bindable is MarkdownView markdownView))
                 return;
 
-            var blockLinks = _links;
-            view.GestureRecognizers.Add(new TapGestureRecognizer
+            markdownView.Padding = markdownView.Theme.Margin;
+            markdownView.BackgroundColor = markdownView.Theme.BackgroundColor;
+
+            var stackLayout = new StackLayout { Spacing = markdownView.Theme.Margin };
+            var document = MarkdigParser.Parse(newValue.ToString());
+            foreach (var block in document.AsEnumerable())
             {
-                Command = new Command(async () => await OnLinkClickedCommand(blockLinks))
-            });
-            _links = new Dictionary<string, string>();
+                var view = markdownView.Render(block, markdownView.Theme);
+                stackLayout.Children.Add(view);
+            }
+            markdownView.Content = stackLayout;
         }
 
-        private async Task OnLinkClickedCommand(IDictionary<string, string> linkDict)
+        private static void AttachLinks(View view, IDictionary<string, string> links)
+        {
+            if (view == null || !links.Any())
+                return;
+
+            var cmd = new Command(async () => await OnLinkClickedCommand(links));
+            view.GestureRecognizers.Add(new TapGestureRecognizer { Command = cmd });
+        }
+
+        private static async Task OnLinkClickedCommand(IDictionary<string, string> linkDict)
         {
             try
             {
-                if (linkDict.Count <= 1)
-                {
-                    NavigateToLink(linkDict.First().Value);
-                    return;
-                }
-                var result = await Application.Current.MainPage.DisplayActionSheet("Open link", /* TODO: Translate */
-                    "Cancel", null, linkDict.Select(x => x.Key).ToArray());
-                var link = linkDict.FirstOrDefault(x => x.Key == result);
-                NavigateToLink(link.Value);
+                await LinkCallbackFunc(linkDict.First().Value);
             }
             catch (Exception ex)
             {
@@ -95,84 +76,81 @@ namespace Xam.Forms.MarkdownView
 
         #region Rendering blocks
 
-        private void Render(Block block)
+        private View Render(Block block, IMarkdownTheme theme)
         {
+            View view = null;
             switch (block)
             {
                 case HeadingBlock heading:
-                    Render(heading);
+                    view = Render(heading, Links, theme, IsQuoted);
                     break;
                 case ParagraphBlock paragraph:
-                    Render(paragraph);
+                    view = Render(paragraph, theme);
                     break;
                 case QuoteBlock quote:
-                    Render(quote);
+                    view = Render(quote, theme);
                     break;
                 case CodeBlock code:
-                    Render(code);
+                    view = Render(code, theme.Code);
                     break;
                 case ListBlock list:
-                    Render(list);
+                    view = Render(list, theme);
                     break;
                 case ThematicBreakBlock thematicBreak:
-                    Render(thematicBreak);
+                    view = Render(thematicBreak, theme.Separator);
                     break;
                 case HtmlBlock html:
-                    Render(html);
+                    view = Render(html, theme);
                     break;
                 default:
                     Debug.WriteLine($"Can't render {block.GetType()} blocks.");
                     break;
             }
+            var stackLayout = new StackLayout();
+            stackLayout.Children.Add(view);
 
-            if (!_queuedViews.Any())
-                return;
+            foreach (var queuedView in QueuedViews)
+                stackLayout.Children.Add(queuedView);
 
-            foreach (var view in _queuedViews)
-                _stackLayout.Children.Add(view);
-
-            _queuedViews.Clear();
+            QueuedViews.Clear();
+            return stackLayout;
         }
 
-        private void Render(ThematicBreakBlock _)
+        private View Render(ThematicBreakBlock _, IBlockStyle style)
         {
-            var separatorStyle = Theme.Separator;
-            if (separatorStyle.BorderSize > 0)
-                _stackLayout.Children.Add(new BoxView
-                {
-                    HeightRequest = separatorStyle.BorderSize,
-                    BackgroundColor = separatorStyle.BorderColor,
-                });
+            var boxView = new BoxView
+            {
+                HeightRequest = style.BorderSize,
+                BackgroundColor = style.BorderColor,
+            };
+            return boxView;
         }
 
-        private void Render(ListBlock block)
+        private View Render(ListBlock block, IMarkdownTheme theme)
         {
-            _listScope++;
+            var currentListScope = 1;
+            var stackLayout = new StackLayout();
             for (var i = 0; i < block.Count(); i++)
                 if (block.ElementAt(i) is ListItemBlock itemBlock)
-                    Render(block, i + 1, itemBlock);
+                    stackLayout.Children.Add(Render(block, i + 1, itemBlock, theme, currentListScope));
 
-            _listScope--;
+            return stackLayout;
+
         }
 
-        private void Render(ListBlock parent, int index, ListItemBlock block)
+        private View Render(ListBlock parent, int index, ListItemBlock block, IMarkdownTheme theme, int listScope = 1)
         {
-            var initialStack = _stackLayout;
-            _stackLayout = new StackLayout { Spacing = Theme.Margin };
-
-            Render(block.AsEnumerable());
 
             var horizontalStack = new StackLayout
             {
                 Orientation = StackOrientation.Horizontal,
-                Margin = new Thickness(_listScope * Theme.Margin, 0, 0, 0),
+                Margin = new Thickness(listScope * theme.Paragraph.BorderSize, 0, 0, 0),
             };
-
             var bullet = parent.IsOrdered ? new Label
             {
                 Text = $"{index}.",
-                FontSize = Theme.Paragraph.FontSize,
-                TextColor = Theme.Paragraph.ForegroundColor,
+                FontSize = theme.Paragraph.FontSize,
+                TextColor = theme.Paragraph.ForegroundColor,
                 VerticalOptions = LayoutOptions.Start,
                 HorizontalOptions = LayoutOptions.End,
             } : (View)new BoxView
@@ -180,123 +158,100 @@ namespace Xam.Forms.MarkdownView
                 WidthRequest = 4,
                 HeightRequest = 4,
                 Margin = new Thickness(0, 6, 0, 0),
-                BackgroundColor = Theme.Paragraph.ForegroundColor,
+                BackgroundColor = theme.Paragraph.ForegroundColor,
                 VerticalOptions = LayoutOptions.Start,
                 HorizontalOptions = LayoutOptions.Center,
             };
             horizontalStack.Children.Add(bullet);
-            horizontalStack.Children.Add(_stackLayout);
-            initialStack.Children.Add(horizontalStack);
 
-            _stackLayout = initialStack;
+            var contentStack = new StackLayout { Orientation = StackOrientation.Horizontal };
+            foreach (var subBlock in block)
+            {
+                var subView = Render(subBlock, theme);
+                contentStack.Children.Add(subView);
+            }
+            horizontalStack.Children.Add(contentStack);
+            return horizontalStack;
         }
 
-        private void Render(HeadingBlock block)
+        private View Render(HeadingBlock block, IDictionary<string, string> links, IMarkdownTheme theme, bool isQuoted)
         {
-            MarkdownStyle style;
+            IBlockStyle blockStyle;
             switch (block.Level)
             {
                 case 1:
-                    style = Theme.Heading1;
+                    blockStyle = theme.Heading1;
                     break;
                 case 2:
-                    style = Theme.Heading2;
+                    blockStyle = theme.Heading2;
                     break;
                 case 3:
-                    style = Theme.Heading3;
+                    blockStyle = theme.Heading3;
                     break;
                 case 4:
-                    style = Theme.Heading4;
+                    blockStyle = theme.Heading4;
                     break;
                 case 5:
-                    style = Theme.Heading5;
+                    blockStyle = theme.Heading5;
                     break;
                 default:
-                    style = Theme.Heading6;
+                    blockStyle = theme.Heading6;
                     break;
             }
 
-            var foregroundColor = _isQuoted ? Theme.Quote.ForegroundColor : style.ForegroundColor;
-
+            var foregroundColor = isQuoted ? theme.Quote.ForegroundColor : blockStyle.ForegroundColor;
             var label = new Label
             {
-                FormattedText = CreateFormatted(block.Inline, style.FontFamily, style.Attributes, foregroundColor, style.BackgroundColor, style.FontSize),
+                TextColor = foregroundColor, // TODO: Check if FormattedText uses this Color, else we need to pass it to CreateFormatted
+                FormattedText = CreateFormatted(block.Inline, blockStyle),
             };
-            AttachLinks(label);
+            AttachLinks(label, links);
 
-            if (style.BorderSize > 0)
+            if (!(blockStyle.BorderSize > 0))
+                return label;
+
+            var headingStack = new StackLayout();
+            headingStack.Children.Add(label);
+            headingStack.Children.Add(new BoxView
             {
-                var headingStack = new StackLayout();
-                headingStack.Children.Add(label);
-                headingStack.Children.Add(new BoxView
-                {
-                    HeightRequest = style.BorderSize,
-                    BackgroundColor = style.BorderColor,
-                });
-                _stackLayout.Children.Add(headingStack);
-            }
-            else
-                _stackLayout.Children.Add(label);
+                HeightRequest = blockStyle.BorderSize,
+                BackgroundColor = blockStyle.BorderColor,
+            });
+            return headingStack;
         }
 
-        private void Render(LeafBlock block)
+        private View Render(LeafBlock block, IDictionary<string, string> links, IBlockStyle style)
         {
-            var style = Theme.Paragraph;
-            var foregroundColor = _isQuoted ? Theme.Quote.ForegroundColor : style.ForegroundColor;
-            var label = new Label
+            var label = new Label { FormattedText = CreateFormatted(block.Inline, style) };
+            AttachLinks(label, links);
+
+            return label;
+        }
+
+        private View Render(QuoteBlock block, IMarkdownTheme theme)
+        {
+            var horizontalStack = new StackLayout
             {
-                FormattedText = CreateFormatted(block.Inline, style.FontFamily, style.Attributes, foregroundColor, style.BackgroundColor, style.FontSize),
+                Orientation = StackOrientation.Horizontal,
+                BackgroundColor = Theme.Quote.BackgroundColor,
             };
-            AttachLinks(label);
-            _stackLayout.Children.Add(label);
-        }
 
-        private void Render(HtmlBlock _)
-        {
-            // Use WkWebView?
-        }
-
-        private void Render(QuoteBlock block)
-        {
-            var initialIsQuoted = _isQuoted;
-            var initialStack = _stackLayout;
-
-            _isQuoted = true;
-            _stackLayout = new StackLayout { Spacing = Theme.Margin };
-
-            var style = Theme.Quote;
-            if (style.BorderSize > 0)
+            horizontalStack.Children.Add(new BoxView
             {
-                var horizontalStack = new StackLayout
-                {
-                    Orientation = StackOrientation.Horizontal,
-                    BackgroundColor = Theme.Quote.BackgroundColor,
-                };
+                WidthRequest = Theme.Quote.BorderSize,
+                BackgroundColor = Theme.Quote.BorderColor,
+            });
 
-                horizontalStack.Children.Add(new BoxView
-                {
-                    WidthRequest = style.BorderSize,
-                    BackgroundColor = style.BorderColor,
-                });
+            IsQuoted = true;
+            foreach (var subBlock in block.AsEnumerable())
+                horizontalStack.Children.Add(Render(subBlock, theme));
+            IsQuoted = false;
 
-                horizontalStack.Children.Add(_stackLayout);
-                initialStack.Children.Add(horizontalStack);
-            }
-            else
-            {
-                _stackLayout.BackgroundColor = Theme.Quote.BackgroundColor;
-                initialStack.Children.Add(_stackLayout);
-            }
-
-            Render(block.AsEnumerable());
-
-            _isQuoted = initialIsQuoted;
-            _stackLayout = initialStack;
+            return horizontalStack;
         }
 
-        private void Render(CodeBlock block)
+        private View Render(CodeBlock block, IBlockStyle style)
         {
-            var style = Theme.Code;
             var label = new Label
             {
                 TextColor = style.ForegroundColor,
@@ -305,72 +260,62 @@ namespace Xam.Forms.MarkdownView
                 FontSize = style.FontSize,
                 Text = string.Join(Environment.NewLine, block.Lines),
             };
-            _stackLayout.Children.Add(new Frame
+            var frame = new Frame
             {
-                CornerRadius = 3,
+                CornerRadius = 3, // TODO: Move magic number to style
                 HasShadow = false,
                 Padding = Theme.Margin,
                 BackgroundColor = style.BackgroundColor,
                 Content = label
-            });
+            };
+            return frame;
         }
 
-        private FormattedString CreateFormatted(ContainerInline inlines, string family, FontAttributes attributes, Color foregroundColor, Color backgroundColor, float size)
+        private FormattedString CreateFormatted(ContainerInline inlines, IBlockStyle theme)
         {
             var fs = new FormattedString();
-            var sp = inlines.Select(inline => CreateSpans(inline, family, attributes, foregroundColor, backgroundColor, size))
-                .Where(spans => spans != null)
-                .SelectMany(spans => spans);
-
+            var sp = inlines.SelectMany(inline => CreateSpans(inline, theme)); // TODO: Should we filter nulls here?
             foreach (var span in sp)
                 fs.Spans.Add(span);
 
             return fs;
         }
 
-        private Span[] CreateSpans(Inline inline, string family, FontAttributes attributes, Color foregroundColor, Color backgroundColor, float size)
+        private IEnumerable<Span> CreateSpans(Inline inline, IBlockStyle style, string fontFamily = null)
         {
-            var spans = Array.Empty<Span>();
+            var spans = new List<Span>();
             switch (inline)
             {
                 case LiteralInline literal:
-                    spans = new[]
+                    var literalSpan = new Span
                     {
-                        new Span
-                        {
-                            Text = literal.Content.Text.Substring(literal.Content.Start, literal.Content.Length),
-                            FontAttributes = attributes,
-                            ForegroundColor = foregroundColor,
-                            BackgroundColor = backgroundColor,
-                            FontSize = size,
-                            FontFamily = family,
-                        }
+                        Text = literal.Content.Text.Substring(literal.Content.Start, literal.Content.Length),
+                        FontAttributes = style.Attributes,
+                        ForegroundColor = style.ForegroundColor,
+                        BackgroundColor = style.BackgroundColor,
+                        FontSize = style.FontSize,
+                        FontFamily = style.FontFamily,
                     };
+                    spans.Add(literalSpan);
                     break;
                 case EmphasisInline emphasis:
-                    var childAttributes = attributes | (emphasis.DelimiterCount == 2 ? FontAttributes.Bold : FontAttributes.Italic);
+                    var childAttributes = emphasis.DelimiterCount == 2 ? FontAttributes.Bold : FontAttributes.Italic;
+                    var childFamily = fontFamily ?? style.FontFamily;
                     switch (childAttributes)
                     {
-                        case FontAttributes.None:
-                            family = Theme.FontFamily;
-                            //family = string.IsNullOrWhiteSpace(family) ? Theme.FontFamily : family;
-                            break;
                         case FontAttributes.Bold:
-                            family = Theme.FontFamilyBold;
-                            //family = string.IsNullOrWhiteSpace(family) ? Theme.FontFamilyBold : family;
+                            childFamily = fontFamily ?? style.FontFamilyBold;
                             break;
                         case FontAttributes.Italic:
-                            family = Theme.FontFamilyItalic;
-                            //family = string.IsNullOrWhiteSpace(family) ? Theme.FontFamilyItalic : family;
-                            break;
-                        default:
-                            family = Theme.FontFamily;
+                            childFamily = fontFamily ?? style.FontFamilyItalic;
                             break;
                     }
-                    spans = emphasis.SelectMany(x => CreateSpans(x, family, childAttributes, foregroundColor, backgroundColor, size)).ToArray();
+                    var emphasedSpans = emphasis.SelectMany(emSpan => CreateSpans(emSpan, style, childFamily));
+                    spans.AddRange(emphasedSpans);
                     break;
-                case LineBreakInline _:
-                    spans = new[] { new Span { Text = "\n" } };
+                case LineBreakInline lineBreak:
+                    var lineBreakSpans = SpanFactory.Create(lineBreak);
+                    spans.AddRange(lineBreakSpans);
                     break;
                 case LinkInline link:
                     var url = link.Url;
@@ -385,46 +330,21 @@ namespace Xam.Forms.MarkdownView
                         else
                             image.Source = url;
 
-                        _queuedViews.Add(image);
+                        QueuedViews.Add(image);
                     }
                     else
                     {
-                        spans = link.SelectMany(x => CreateSpans(x, Theme.Link.FontFamily ?? family, Theme.Link.Attributes, Theme.Link.ForegroundColor, Theme.Link.BackgroundColor, size)).ToArray();
-                        _links.Add(new KeyValuePair<string, string>(string.Join(string.Empty, spans.Select(x => x.Text)), url));
+                        spans = link.SelectMany(l => CreateSpans(l, style)).ToList();
+                        Links.Add(new KeyValuePair<string, string>(string.Join(string.Empty, spans.Select(x => x.Text)), url));
                     }
                     break;
                 case CodeInline code:
-                    spans = new[]
-                    {
-                        new Span
-                        {
-                            Text="\u2002",
-                            FontSize = size,
-                            FontFamily = Theme.Code.FontFamily,
-                            ForegroundColor = Theme.Code.ForegroundColor,
-                            BackgroundColor = Theme.Code.BackgroundColor
-                        },
-                        new Span
-                        {
-                            Text = code.Content,
-                            FontAttributes = Theme.Code.Attributes,
-                            FontSize = size,
-                            FontFamily = Theme.Code.FontFamily,
-                            ForegroundColor = Theme.Code.ForegroundColor,
-                            BackgroundColor = Theme.Code.BackgroundColor
-                        },
-                        new Span
-                        {
-                            Text="\u2002",
-                            FontSize = size,
-                            FontFamily = Theme.Code.FontFamily,
-                            ForegroundColor = Theme.Code.ForegroundColor,
-                            BackgroundColor = Theme.Code.BackgroundColor
-                        },
-                    };
+                    var codeSpans = SpanFactory.Create(code, style.ForegroundColor, style.BackgroundColor,
+                        style.FontFamily, style.Attributes, style.FontSize);
+                    spans.AddRange(codeSpans);
                     break;
                 default:
-                    Debug.WriteLine($"Can't render {inline.GetType().FullName} inlines.");
+                    Debug.WriteLine($"Can't render Inline of type {inline.GetType().FullName}.");
                     break;
             }
             return spans;

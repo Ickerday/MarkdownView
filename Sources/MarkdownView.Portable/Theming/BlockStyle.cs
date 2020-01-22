@@ -1,8 +1,8 @@
 ﻿using Xamarin.Forms;
 
-namespace Xam.Forms.MarkdownView
+namespace MarkdownView.Theming
 {
-    public class MarkdownStyle
+    public class BlockStyle : IBlockStyle
     {
         public FontAttributes Attributes { get; set; } = FontAttributes.None;
 

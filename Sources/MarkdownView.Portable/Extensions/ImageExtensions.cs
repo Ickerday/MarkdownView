@@ -6,7 +6,7 @@ using System.Net;
 using Xamarin.Forms;
 using SKSvg = SkiaSharp.Extended.Svg.SKSvg;
 
-namespace Xam.Forms.MarkdownView.Extensions
+namespace MarkdownView.Extensions
 {
     public static class ImageExtensions
     {
@@ -16,7 +16,7 @@ namespace Xam.Forms.MarkdownView.Extensions
             {
                 var svg = new SKSvg();
                 var req = (HttpWebRequest)WebRequest.Create(uri);
-                req.BeginGetResponse((ar) =>
+                req.BeginGetResponse(ar =>
                 {
                     var res = (ar.AsyncState as HttpWebRequest)?.EndGetResponse(ar) as HttpWebResponse;
                     using (var stream = res?.GetResponseStream())
