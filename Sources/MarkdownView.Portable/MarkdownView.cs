@@ -44,12 +44,13 @@ namespace Xam.Forms.MarkdownView
         {
             Padding = Theme.Margin;
             BackgroundColor = Theme.BackgroundColor;
+            _stackLayout = new StackLayout { Spacing = Theme.Margin };
             if (!string.IsNullOrWhiteSpace(Markdown))
             {
                 var parsed = MarkdigParser.Parse(Markdown);
                 Render(parsed.AsEnumerable());
             }
-            Content = _stackLayout = new StackLayout { Spacing = Theme.Margin };
+            Content = _stackLayout; // Show the content only when the whole text has been parsed
         }
 
         private void Render(IEnumerable<Block> blocks)
