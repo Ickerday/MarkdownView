@@ -1,7 +1,7 @@
-﻿namespace Xam.Forms.Markdown
-{
-    using Xamarin.Forms;
+﻿using Xamarin.Forms;
 
+namespace Xam.Forms.MarkdownView
+{
     public class MarkdownStyle
     {
         public FontAttributes Attributes { get; set; } = FontAttributes.None;
@@ -17,5 +17,9 @@
         public float BorderSize { get; set; }
 
         public string FontFamily { get; set; }
+
+        public string FontFamilyItalic { get; set; }
+
+        public string FontFamilyBold { get; set; }
     }
 }

@@ -1,9 +1,9 @@
-﻿namespace Xam.Forms.Markdown
+﻿namespace Xam.Forms.MarkdownView.Extensions
 {
     using System.Text.RegularExpressions;
 
     /// <summary>
-    /// A set o helper extensions for parsing Github common urls.
+    /// A set of helper extensions for parsing Github common urls.
     /// </summary>
     public static class GithubExtensions
     {
@@ -14,7 +14,7 @@
         public static bool TryExtractGithubRawMarkdownUrl(string url, out string readmeUrl)
         {
             var match = GithubRepoRegex.Match(url);
-            if(match.Success)
+            if (match.Success)
             {
                 var user = match.Groups[2].Value;
                 var repo = match.Groups[3].Value;
@@ -22,7 +22,6 @@
                 readmeUrl = string.Format(GithubReadmeUrl, user, repo, branch);
                 return true;
             }
-
             readmeUrl = null;
             return false;
         }
