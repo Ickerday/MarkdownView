@@ -95,7 +95,7 @@ namespace MarkdownView
             }
         }
 
-        #region Rendering blocks
+        #region BLOCK_RENDERERS
 
         private void Render(Block block)
         {
@@ -351,7 +351,10 @@ namespace MarkdownView
                     break;
                 case LinkInline link:
                     var url = link.Url;
-                    if (!(url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+                    if (!(url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+                          url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                          url.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) || 
+                          url.StartsWith("tel:", StringComparison.OrdinalIgnoreCase)))
                         url = $"{RelativeUrlHost?.TrimEnd('/')}/{url.TrimStart('/')}";
 
                     if (link.IsImage)
