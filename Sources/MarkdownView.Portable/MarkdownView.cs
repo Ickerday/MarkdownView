@@ -2,6 +2,7 @@
 using Markdig.Syntax.Inlines;
 using MarkdownView.Extensions;
 using MarkdownView.Factories.Spans;
+using MarkdownView.Factories.Views;
 using MarkdownView.Theming;
 using System;
 using System.Collections.Generic;
@@ -19,7 +20,9 @@ namespace MarkdownView
     public class MarkdownView : ContentView
     {
         private List<View> QueuedViews { get; } = new List<View>();
+
         private IDictionary<string, string> Links { get; } = new Dictionary<string, string>();
+
         private bool IsQuoted { get; set; }
 
         public static Func<string, Task> LinkCallbackFunc { get; set; } = async uriString => await Launcher.OpenAsync(new Uri(uriString));
@@ -31,6 +34,7 @@ namespace MarkdownView
         public string RelativeUrlHost { get => (string)GetValue(RelativeUrlHostProperty); set => SetValue(RelativeUrlHostProperty, value); }
 
         public static BaseTheme DefaultTheme = new LightTheme();
+
         public static readonly BindableProperty ThemeProperty = BindableProperty.Create(nameof(Theme), typeof(BaseTheme), typeof(MarkdownView), DefaultTheme, propertyChanged: OnMarkdownChanged);
         public BaseTheme Theme { get => (BaseTheme)GetValue(ThemeProperty); set => SetValue(ThemeProperty, value); }
 
@@ -46,7 +50,7 @@ namespace MarkdownView
             var document = MarkdigParser.Parse(newValue.ToString());
             foreach (var block in document.AsEnumerable())
             {
-                var view = markdownView.Render(block, markdownView.Theme);
+                var view = markdownView.Render(block, markdownView.Theme, markdownView.Links);
                 stackLayout.Children.Add(view);
             }
             markdownView.Content = stackLayout;
@@ -65,7 +69,15 @@ namespace MarkdownView
         {
             try
             {
-                await LinkCallbackFunc(linkDict.First().Value);
+                if (linkDict.Count <= 1)
+                    await LinkCallbackFunc(linkDict.First().Value);
+                else
+                {
+                    var options = linkDict.Select(x => x.Key).ToArray();
+                    var result = await Application.Current.MainPage.DisplayActionSheet("Open link", "Cancel", null, options);
+                    var link = linkDict.FirstOrDefault(x => x.Key == result);
+                    await LinkCallbackFunc(link.Value);
+                }
             }
             catch (Exception ex)
             {
@@ -76,13 +88,13 @@ namespace MarkdownView
 
         #region Rendering blocks
 
-        private View Render(Block block, IMarkdownTheme theme)
+        private View Render(Block block, IMarkdownTheme theme, IDictionary<string, string> links)
         {
             View view = null;
             switch (block)
             {
                 case HeadingBlock heading:
-                    view = Render(heading, Links, theme, IsQuoted);
+                    view = Render(heading, links, theme, IsQuoted);
                     break;
                 case ParagraphBlock paragraph:
                     view = Render(paragraph, theme);
@@ -100,7 +112,7 @@ namespace MarkdownView
                     view = Render(thematicBreak, theme.Separator);
                     break;
                 case HtmlBlock html:
-                    view = Render(html, theme);
+                    view = HtmlBlockFactory.Create(html);
                     break;
                 default:
                     Debug.WriteLine($"Can't render {block.GetType()} blocks.");
@@ -116,13 +128,23 @@ namespace MarkdownView
             return stackLayout;
         }
 
+        private View Render(ParagraphBlock block, IMarkdownTheme theme)
+        {
+            var label = new Label();
+            label.TextColor = IsQuoted ? theme.Quote.ForegroundColor : theme.Paragraph.ForegroundColor;
+            label.FormattedText = CreateFormatted(block.Inline, theme.Paragraph);
+
+            AttachLinks(label, Links);
+
+            return label;
+        }
+
         private View Render(ThematicBreakBlock _, IBlockStyle style)
         {
-            var boxView = new BoxView
-            {
-                HeightRequest = style.BorderSize,
-                BackgroundColor = style.BorderColor,
-            };
+            var boxView = new BoxView();
+            boxView.HeightRequest = style.BorderSize;
+            boxView.BackgroundColor = style.BorderColor;
+
             return boxView;
         }
 
@@ -141,11 +163,10 @@ namespace MarkdownView
         private View Render(ListBlock parent, int index, ListItemBlock block, IMarkdownTheme theme, int listScope = 1)
         {
 
-            var horizontalStack = new StackLayout
-            {
-                Orientation = StackOrientation.Horizontal,
-                Margin = new Thickness(listScope * theme.Paragraph.BorderSize, 0, 0, 0),
-            };
+            var horizontalStack = new StackLayout();
+            horizontalStack.Orientation = StackOrientation.Horizontal;
+            horizontalStack.Margin = new Thickness(listScope * theme.Paragraph.BorderSize, 0, 0, 0);
+
             var bullet = parent.IsOrdered ? new Label
             {
                 Text = $"{index}.",
@@ -167,7 +188,7 @@ namespace MarkdownView
             var contentStack = new StackLayout { Orientation = StackOrientation.Horizontal };
             foreach (var subBlock in block)
             {
-                var subView = Render(subBlock, theme);
+                var subView = Render(subBlock, theme, Links);
                 contentStack.Children.Add(subView);
             }
             horizontalStack.Children.Add(contentStack);
@@ -220,14 +241,6 @@ namespace MarkdownView
             return headingStack;
         }
 
-        private View Render(LeafBlock block, IDictionary<string, string> links, IBlockStyle style)
-        {
-            var label = new Label { FormattedText = CreateFormatted(block.Inline, style) };
-            AttachLinks(label, links);
-
-            return label;
-        }
-
         private View Render(QuoteBlock block, IMarkdownTheme theme)
         {
             var horizontalStack = new StackLayout
@@ -244,7 +257,7 @@ namespace MarkdownView
 
             IsQuoted = true;
             foreach (var subBlock in block.AsEnumerable())
-                horizontalStack.Children.Add(Render(subBlock, theme));
+                horizontalStack.Children.Add(Render(subBlock, theme, Links));
             IsQuoted = false;
 
             return horizontalStack;

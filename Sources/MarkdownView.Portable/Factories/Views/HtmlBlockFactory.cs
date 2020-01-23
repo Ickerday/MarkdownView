@@ -6,12 +6,12 @@ namespace MarkdownView.Factories.Views
     /// <summary>
     /// TODO
     /// </summary>
-    public class HtmlBlockFactory
+    public static class HtmlBlockFactory
     {
         /// <summary>
         /// TODO
         /// </summary>
-        private View Create(HtmlBlock _)
+        public static View Create(HtmlBlock _)
         {
             var htmlSource = new HtmlWebViewSource { Html = _.ToString() };
 
