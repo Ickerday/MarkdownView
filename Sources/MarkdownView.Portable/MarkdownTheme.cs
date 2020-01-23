@@ -1,6 +1,6 @@
 ﻿using Xamarin.Forms;
 
-namespace Xam.Forms.MarkdownView
+namespace MarkdownView
 {
     public class MarkdownTheme
     {

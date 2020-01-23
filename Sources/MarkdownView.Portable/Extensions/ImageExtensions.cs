@@ -1,12 +1,12 @@
-﻿using SkiaSharp;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using SkiaSharp;
 using Xamarin.Forms;
 using SKSvg = SkiaSharp.Extended.Svg.SKSvg;
 
-namespace Xam.Forms.MarkdownView.Extensions
+namespace MarkdownView.Extensions
 {
     public static class ImageExtensions
     {

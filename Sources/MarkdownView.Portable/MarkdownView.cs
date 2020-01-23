@@ -1,18 +1,18 @@
-﻿using Markdig.Syntax;
-using Markdig.Syntax.Inlines;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Xam.Forms.MarkdownView.Extensions;
-using Xam.Forms.MarkdownView.Themes;
+using Markdig.Syntax;
+using Markdig.Syntax.Inlines;
+using MarkdownView.Extensions;
+using MarkdownView.Theming;
 using Xamarin.Essentials;
 using Xamarin.Forms;
 using MarkdigParser = Markdig.Markdown;
 
-namespace Xam.Forms.MarkdownView
+namespace MarkdownView
 {
     public class MarkdownView : ContentView
     {
@@ -30,7 +30,7 @@ namespace Xam.Forms.MarkdownView
         public string RelativeUrlHost { get => (string)GetValue(RelativeUrlHostProperty); set => SetValue(RelativeUrlHostProperty, value); }
         public static readonly BindableProperty RelativeUrlHostProperty = BindableProperty.Create(nameof(RelativeUrlHost), typeof(string), typeof(MarkdownView), null, propertyChanged: OnMarkdownChanged);
 
-        public static MarkdownTheme DefaultTheme = new LightMarkdownTheme();
+        public static MarkdownTheme DefaultTheme = new LightTheme();
         public MarkdownTheme Theme { get => (MarkdownTheme)GetValue(ThemeProperty); set => SetValue(ThemeProperty, value); }
         public static readonly BindableProperty ThemeProperty = BindableProperty.Create(nameof(Theme), typeof(MarkdownTheme), typeof(MarkdownView), DefaultTheme, propertyChanged: OnMarkdownChanged);
 
