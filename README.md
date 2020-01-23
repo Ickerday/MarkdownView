@@ -1,6 +1,6 @@
 # MarkdownView _for Xamarin.Forms_
 
-[![NuGet](https://img.shields.io/nuget/v/Xam.Forms.MarkdownView.svg?label=NuGet)](https://www.nuget.org/packages/Xam.Forms.MarkdownView/) [![Donate](https://img.shields.io/badge/donate-paypal-yellow.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=ZJZKXPPGBKKAY&lc=US&item_name=GitHub&item_number=0000001&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donate_SM%2egif%3aNonHosted)
+[![NuGet](https://img.shields.io/nuget/v/MarkdownView.svg?label=NuGet)](https://www.nuget.org/packages/MarkdownView)
 
 A native Xamarin.Forms Markdown renderer.
 
@@ -16,7 +16,7 @@ This will produce a more reactive user interface, at the cost of rendering funct
 
 ## Install
 
-Available on [NuGet](https://www.nuget.org/packages/Xam.Forms.MarkdownView/).
+Available on [NuGet](https://www.nuget.org/packages/MarkdownView).
 
 ## Quickstart
 
@@ -31,42 +31,42 @@ this.Content = view;
 
 Unfortunately, Xamarin.Forms string rendering has some limitations ...
 
--   **Inlined images aren't supported** (_Xamarin.Forms formatted strings doesn't support inlined views_) : They will be displayed after the block they are referenced from.
--   **Links are only clickable at a leaf block level** (_Xamarin.Forms formatted strings doesn't support span user interactions_) : if a leaf block contains more than one link, the user is prompted. This is almost a feature since text may be too small to be enough precise! ;)
--   **SVG rendering is very limited** (_The SVG rendering is based on SkiaSharp which doesn't seem to manage well all svg renderings_)
+- **Inlined images aren't supported** (_Xamarin.Forms formatted strings doesn't support inlined views_) : They will be displayed after the block they are referenced from.
+- **Links are only clickable at a leaf block level** (_Xamarin.Forms formatted strings doesn't support span user interactions_) : if a leaf block contains more than one link, the user is prompted. This is almost a feature since text may be too small to be enough precise! ;)
+- **SVG rendering is very limited** (_The SVG rendering is based on SkiaSharp which doesn't seem to manage well all svg renderings_)
 
 ## Roadmap
 
--   **Customization**
+- **Customization**
     _ [X] Styles
     _ [X] Themes
--   **Leaf blocks**
+- **Leaf blocks**
     _ [X] Headings
     _ [X] Paragraphs
     _ [ ] HTML Blocks (maybe partial and specific support)
     _ [ ] Link reference definitions
     _ [X] Code blocks
     _ [X] Thematic breaks
--   **Container blocks**
+   **Container blocks**
     _ [X] Block quote
     _ [X] Lists
     _ [ ] Numbers bullet formats
     _ [ ] Custom bullets
--   **Inlines**
+- **Inlines**
     _ [X] Textual content
     _ [X] Emphasis and string emphasis
     _ [X] Code spans
     _ [X] Links (partial, no interaction)
     _ [X] Image blocks (partial, not inlined)
     _ [X] SVG Rendering (Skia)
--   **Extensions**
+   **Extensions**
     _ [ ] Table blocks
     _ [ ] Emojis (ascii) \* [ ] Task lists
 
 ## Thanks
 
--   [lunet-io/markdig](https://github.com/lunet-io/markdig) : used for Markdown parsing
--   [mono/SkiaSharp](https://github.com/mono/SkiaSharp) : used for SVG rendering
+- [lunet-io/markdig](https://github.com/lunet-io/markdig) : used for Markdown parsing
+- [mono/SkiaSharp](https://github.com/mono/SkiaSharp) : used for SVG rendering
 
 ## Contributions
 
