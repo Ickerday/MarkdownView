@@ -1,13 +1,13 @@
-﻿using System;
+﻿using Markdig.Syntax;
+using Markdig.Syntax.Inlines;
+using MarkdownView.Extensions;
+using MarkdownView.Theming;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Markdig.Syntax;
-using Markdig.Syntax.Inlines;
-using MarkdownView.Extensions;
-using MarkdownView.Theming;
 using Xamarin.Essentials;
 using Xamarin.Forms;
 using MarkdigParser = Markdig.Markdown;
@@ -30,7 +30,7 @@ namespace MarkdownView
         public string RelativeUrlHost { get => (string)GetValue(RelativeUrlHostProperty); set => SetValue(RelativeUrlHostProperty, value); }
         public static readonly BindableProperty RelativeUrlHostProperty = BindableProperty.Create(nameof(RelativeUrlHost), typeof(string), typeof(MarkdownView), null, propertyChanged: OnMarkdownChanged);
 
-        public static MarkdownTheme DefaultTheme = new LightTheme();
+        private static readonly MarkdownTheme DefaultTheme = new LightTheme();
         public MarkdownTheme Theme { get => (MarkdownTheme)GetValue(ThemeProperty); set => SetValue(ThemeProperty, value); }
         public static readonly BindableProperty ThemeProperty = BindableProperty.Create(nameof(Theme), typeof(MarkdownTheme), typeof(MarkdownView), DefaultTheme, propertyChanged: OnMarkdownChanged);
 
@@ -67,7 +67,7 @@ namespace MarkdownView
             var blockLinks = _links;
             view.GestureRecognizers.Add(new TapGestureRecognizer
             {
-                Command = new Command(async () => await OnLinkClickedCommand(blockLinks))
+                Command = new Command(async () => await OnLinkClickedCommand(blockLinks).ConfigureAwait(false))
             });
             _links = new Dictionary<string, string>();
         }
@@ -82,7 +82,9 @@ namespace MarkdownView
                     return;
                 }
                 var result = await Application.Current.MainPage.DisplayActionSheet("Open link", /* TODO: Translate */
-                    "Cancel", null, linkDict.Select(x => x.Key).ToArray());
+                    "Cancel", null, linkDict.Select(x => x.Key).ToArray())
+                    .ConfigureAwait(false);
+
                 var link = linkDict.FirstOrDefault(x => x.Key == result);
                 NavigateToLink(link.Value);
             }
@@ -148,7 +150,7 @@ namespace MarkdownView
         private void Render(ListBlock block)
         {
             _listScope++;
-            for (var i = 0; i < block.Count(); i++)
+            for (var i = 0; i < block.Count; i++)
                 if (block.ElementAt(i) is ListItemBlock itemBlock)
                     Render(block, i + 1, itemBlock);
 
@@ -193,29 +195,15 @@ namespace MarkdownView
 
         private void Render(HeadingBlock block)
         {
-            MarkdownStyle style;
-            switch (block.Level)
+            var style = block.Level switch
             {
-                case 1:
-                    style = Theme.Heading1;
-                    break;
-                case 2:
-                    style = Theme.Heading2;
-                    break;
-                case 3:
-                    style = Theme.Heading3;
-                    break;
-                case 4:
-                    style = Theme.Heading4;
-                    break;
-                case 5:
-                    style = Theme.Heading5;
-                    break;
-                default:
-                    style = Theme.Heading6;
-                    break;
-            }
-
+                1 => Theme.Heading1,
+                2 => Theme.Heading2,
+                3 => Theme.Heading3,
+                4 => Theme.Heading4,
+                5 => Theme.Heading5,
+                _ => Theme.Heading6,
+            };
             var foregroundColor = _isQuoted ? Theme.Quote.ForegroundColor : style.ForegroundColor;
 
             var label = new Label
@@ -251,7 +239,7 @@ namespace MarkdownView
             _stackLayout.Children.Add(label);
         }
 
-        private void Render(HtmlBlock _)
+        private static void Render(HtmlBlock _)
         {
             // Use WkWebView?
         }
@@ -349,24 +337,13 @@ namespace MarkdownView
                     break;
                 case EmphasisInline emphasis:
                     var childAttributes = attributes | (emphasis.DelimiterCount == 2 ? FontAttributes.Bold : FontAttributes.Italic);
-                    switch (childAttributes)
+                    family = childAttributes switch
                     {
-                        case FontAttributes.None:
-                            family = Theme.FontFamily;
-                            //family = string.IsNullOrWhiteSpace(family) ? Theme.FontFamily : family;
-                            break;
-                        case FontAttributes.Bold:
-                            family = Theme.FontFamilyBold;
-                            //family = string.IsNullOrWhiteSpace(family) ? Theme.FontFamilyBold : family;
-                            break;
-                        case FontAttributes.Italic:
-                            family = Theme.FontFamilyItalic;
-                            //family = string.IsNullOrWhiteSpace(family) ? Theme.FontFamilyItalic : family;
-                            break;
-                        default:
-                            family = Theme.FontFamily;
-                            break;
-                    }
+                        FontAttributes.None => Theme.FontFamily,
+                        FontAttributes.Bold => Theme.FontFamilyBold,
+                        FontAttributes.Italic => Theme.FontFamilyItalic,
+                        _ => Theme.FontFamily,
+                    };
                     spans = emphasis.SelectMany(x => CreateSpans(x, family, childAttributes, foregroundColor, backgroundColor, size)).ToArray();
                     break;
                 case LineBreakInline _:
@@ -374,7 +351,7 @@ namespace MarkdownView
                     break;
                 case LinkInline link:
                     var url = link.Url;
-                    if (!(url.StartsWith("http://") || url.StartsWith("https://")))
+                    if (!(url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
                         url = $"{RelativeUrlHost?.TrimEnd('/')}/{url.TrimStart('/')}";
 
                     if (link.IsImage)
@@ -389,16 +366,17 @@ namespace MarkdownView
                     }
                     else
                     {
-                        spans = link.SelectMany(x => CreateSpans(x, Theme.Link.FontFamily ?? family, Theme.Link.Attributes, Theme.Link.ForegroundColor, Theme.Link.BackgroundColor, size)).ToArray();
+                        spans = link.SelectMany(x => CreateSpans(x, family ?? Theme.Link.FontFamily, Theme.Link.Attributes, Theme.Link.ForegroundColor, Theme.Link.BackgroundColor, size)).ToArray();
                         _links.Add(new KeyValuePair<string, string>(string.Join(string.Empty, spans.Select(x => x.Text)), url));
                     }
                     break;
                 case CodeInline code:
+                    const string codeChar = "\u2002";
                     spans = new[]
                     {
                         new Span
                         {
-                            Text="\u2002",
+                            Text = codeChar,
                             FontSize = size,
                             FontFamily = Theme.Code.FontFamily,
                             ForegroundColor = Theme.Code.ForegroundColor,
@@ -415,7 +393,7 @@ namespace MarkdownView
                         },
                         new Span
                         {
-                            Text="\u2002",
+                            Text = codeChar,
                             FontSize = size,
                             FontFamily = Theme.Code.FontFamily,
                             ForegroundColor = Theme.Code.ForegroundColor,
